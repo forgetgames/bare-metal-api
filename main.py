@@ -5,6 +5,9 @@ import secrets
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
+import elara as elara
+import schedule
+
 
 load_dotenv()
 
@@ -13,10 +16,13 @@ BASIC_PASSWORD = os.getenv('BASIC_PASSWORD')
 
 app = FastAPI()
 security = HTTPBasic()
+db = elara.exe(os.getenv('SERVER_DB'), True)
 
 
+# TODO: Move types to commonm area
 class Server(BaseModel):
     code: str
+    path: str = None
     name: str
     description: str
     playerCount: int
@@ -25,41 +31,11 @@ class Server(BaseModel):
 
 
 # TODO: Parse server details/use their apis
-# TODO: Add caching middleware
-servers = {
-    "7d2d": {
-        "user": "sdtdserver",
-        "code": "sdtdserver",
-        "name": "7 Days 2 Die",
-        "description": "The usual sessional play through with the crew.",
-        "playerCount": 0,
-        "maxPlayers": 10,
-        "status": "offline"},
-    "Minecraft": {
-        "user": "minecraft",
-        "code": "screen",
-        "name": "Minecraft",
-        "description": "Some mod pack",
-        "playerCount": 0,
-        "maxPlayers": 10,
-        "status": "offline"},
-    "Valhiem": {
-        "user": "vhserver2",
-        "code": "vhserver",
-        "name": "Valhiem",
-        "description": "Third rendition of a P.O.T 24/7 server.",
-        "playerCount": 1,
-        "maxPlayers": 64,
-        "status": "online"},
-    "Satisfactory": {
-        "user": "satisfactory",
-        "code": "sfserver",
-        "name": "Satisfactory",
-        "description": "First play through to end game.",
-        "playerCount": 5,
-        "maxPlayers": 10,
-        "status": "restarting"},
-}
+# TODO: Create object oriented server mamagment
+server_keys = db.hkeys('servers')
+servers = {}
+for key in server_keys:
+    servers[key] = db.hget('servers', key)
 
 
 def auth_validation(credentials: HTTPBasicCredentials = Depends(security)):
@@ -73,8 +49,6 @@ def auth_validation(credentials: HTTPBasicCredentials = Depends(security)):
             headers={"WWW-Authenticate": "Basic"},
         )
 
-# TODO: use correct user
-
 
 def executor(server_id: str, function_code: str):
     if server_id in servers.keys():
@@ -86,32 +60,46 @@ def executor(server_id: str, function_code: str):
 
 
 @app.get("/servers", response_model=List[Server])
-def read_root(credentials: HTTPBasicCredentials = Depends(auth_validation)):
-    return list(servers.values())
+async def read_root(credentials: HTTPBasicCredentials = Depends(auth_validation)):
+    current_servers = db.hvals('servers')
+    return list(current_servers)
 
 
 @app.get("/servers/{server_id}", response_model=Server)
-def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
-    return servers[server_id]
+async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+    return db.hget('servers', server_id)
+
+
+@app.patch("/servers/{server_id}", response_model=Server)
+async def set_item(server_id: str, body: Server, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+    update_data = body.dict(exclude_unset=True)
+    if db.hexists('servers', server_id) is not True:
+        raise HTTPException(status_code=404, detail="Server not found")
+    server = db.hget('servers', server_id)
+    current_model = Server(**server)
+    update_model = current_model.copy(update=update_data)
+    db.hadd('servers', server_id, update_model)
+    db.commit()
+    return update_model
 
 
 @app.get("/servers/{server_id}/start", response_model=Server)
-def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "start")
 
 
 @app.get("/servers/{server_id}/stop", response_model=Server)
-def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "stop")
 
 
 @app.get("/servers/{server_id}/restart", response_model=Server)
-def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "restart")
 
 
 @app.get("/servers/{server_id}/update", response_model=Server)
-def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "update")
 
 # @app.get("/servers/{server_id}/swap", response_model=Server)
