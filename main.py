@@ -1,13 +1,15 @@
-import os
+from xmlrpc.client import boolean
 from dotenv import load_dotenv
-from typing import List
-import secrets
+import elara as elara
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel
-import elara as elara
+from fgtypes import Server, GameDigServer, GameDigServerRaw
+import json
+import os
+import subprocess
 import schedule
-
+import secrets
+from typing import List
 
 load_dotenv()
 
@@ -19,23 +21,37 @@ security = HTTPBasic()
 db = elara.exe(os.getenv('SERVER_DB'), True)
 
 
-# TODO: Move types to commonm area
-class Server(BaseModel):
-    code: str
-    path: str = None
-    name: str
-    description: str
-    playerCount: int
-    maxPlayers: int
-    status: str
-
-
 # TODO: Parse server details/use their apis
 # TODO: Create object oriented server mamagment
 server_keys = db.hkeys('servers')
 servers = {}
 for key in server_keys:
     servers[key] = db.hget('servers', key)
+
+
+def update_server(server_id: str):
+    server: Server = db.hget('servers', server_id)
+    if server.port:
+        response_data = subprocess.run(['gamedig', '--type', 'protocol-valve', '--host',
+                                        '127.0.0.1', '--port', server.port], stdout=subprocess.PIPE).stdout.decode('utf-8')
+        response_model: GameDigServer = json.loads(response_data)
+        if response_model.ping:
+            server.maxPlayers = response_model.maxplayers
+            server.playerCount = response_model.raw.numplayers
+            server.name = response_model.name
+            server.status = 'online'
+        elif server.status is not 'restarting':
+            server.status = 'offline'
+        db.hadd('servers', server_id, server)
+
+
+def update_server_list():
+    server_ids = db.hkeys('servers')
+    for server_id in server_ids:
+        update_server(server_id)
+
+
+schedule.every(1).minutes.do(update_server_list)
 
 
 def auth_validation(credentials: HTTPBasicCredentials = Depends(security)):
@@ -95,6 +111,9 @@ async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(
 
 @app.get("/servers/{server_id}/restart", response_model=Server)
 async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+    server: Server = db.hget('servers', server_id)
+    server.status = 'restarting'
+    db.hadd('servers', server_id, server)
     return executor(server_id, "restart")
 
 
