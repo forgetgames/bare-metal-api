@@ -1,6 +1,6 @@
 # Forget Games API
 
-This application is to serve the available game actions with current bare metal contexts. 
+This application is to serve the available game actions with current bare metal contexts.
 
 Requirements
 
