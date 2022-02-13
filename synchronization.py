@@ -15,7 +15,7 @@ def update_server(db: Elara, SERVERS_DOCUMENT: str, server_id: str):
 
     # TODO: Add the ports before it can sync
     if server_model.port:
-        cmd = ['gamedig', '--type', 'protocol-valve', '--host',
+        cmd = ['gamedig', '--type', server_model.protocol, '--host',
                '127.0.0.1', '--port', server_model.port]
         response_data = subprocess.run(
             cmd, stdout=subprocess.PIPE).stdout.decode('utf-8')
