@@ -1,5 +1,8 @@
 # Forget Games API
 
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![Project Backers](https://opencollective.com/forget-games/tiers/badge.svg)](https://opencollective.com/forget-games)
+
 This application is to serve the available game actions with current bare metal contexts.
 
 Requirements
