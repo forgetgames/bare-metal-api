@@ -1,15 +1,14 @@
 from elara import Elara
-from fgtypes import Server, GameDigServer
+from apps.fgtypes import Server, GameDigServer
 import json
 import subprocess
 import schedule
-from serversfsm import SyncAction
+from apps.serversfsm import SyncAction
 import time
-from datetime import timedelta
 
 
-def update_server(db: Elara, SERVERS_DOCUMENT: str, server_id: str):
-    server_data = db.hget(SERVERS_DOCUMENT, server_id)
+def update_server(db: Elara, servers_document: str, server_id: str):
+    server_data = db.hget(servers_document, server_id)
     server_model = Server()
     server_model = server_model.copy(update=server_data)
 
@@ -17,8 +16,7 @@ def update_server(db: Elara, SERVERS_DOCUMENT: str, server_id: str):
     if server_model.port:
         cmd = ['gamedig', '--type', server_model.protocol, '--host',
                '127.0.0.1', '--port', server_model.port]
-        response_data = subprocess.run(
-            cmd, stdout=subprocess.PIPE).stdout.decode('utf-8')
+        response_data = subprocess.run(cmd, stdout=subprocess.PIPE, check=True).stdout.decode('utf-8')
         response_model = GameDigServer()
         response_model = response_model.copy(update=json.loads(response_data))
         if response_model.ping:
@@ -28,20 +26,20 @@ def update_server(db: Elara, SERVERS_DOCUMENT: str, server_id: str):
             server_model.status = SyncAction.ONLINE.value
         elif server_model.status is not SyncAction.RESTARTING.value:
             server_model.status = SyncAction.OFFLINE.value
-        db.hadd(SERVERS_DOCUMENT, server_id, server_model.dict())
+        db.hadd(servers_document, server_id, server_model.dict())
         db.commit()
 
 
-def update_server_list(db: Elara, SERVERS_DOCUMENT: str):
-    server_ids = db.hkeys(SERVERS_DOCUMENT)
+def update_server_list(db: Elara, servers_document: str):
+    server_ids = db.hkeys(servers_document)
     for server_id in server_ids:
         print('using key', server_id)
-        update_server(db, SERVERS_DOCUMENT, server_id)
+        update_server(db, servers_document, server_id)
 
 
-def start_sync(db: Elara, SERVERS_DOCUMENT: str, INTERVAL_IN_MINUTES: int):
-    schedule.every(INTERVAL_IN_MINUTES).seconds.do(
-        update_server_list, db, SERVERS_DOCUMENT)
+def start_sync(db: Elara, servers_document: str, interval_in_minutes: int):
+    schedule.every(interval_in_minutes).seconds.do(
+        update_server_list, db, servers_document)
     while True:
         schedule.run_pending()
-        time.sleep(INTERVAL_IN_MINUTES * 60)
+        time.sleep(interval_in_minutes * 60)

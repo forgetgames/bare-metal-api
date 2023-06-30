@@ -1,21 +1,22 @@
+""" entrypoint """
 from dotenv import load_dotenv
 from elara import exe
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fgtypes import Server
+from apps.fgtypes import Server
 import os
 import secrets
-from synchronization import start_sync
+from crons.synchronization import start_sync
 from threading import Thread
 from typing import List
 
 load_dotenv()
 
-BASIC_USER = os.getenv('BASIC_USER')
-BASIC_PASSWORD = os.getenv('BASIC_PASSWORD')
-SERVERS_DOCUMENT = os.getenv('SERVERS_DOCUMENT')
-SERVERS_DB = os.getenv('SERVERS_DB')
-INTERVAL_IN_MINUTES = os.getenv('INTERVAL_IN_MINUTES')
+BASIC_USER = os.getenv("BASIC_USER")
+BASIC_PASSWORD = os.getenv("BASIC_PASSWORD")
+SERVERS_DOCUMENT = os.getenv("SERVERS_DOCUMENT")
+SERVERS_DB = os.getenv("SERVERS_DB")
+INTERVAL_IN_MINUTES = os.getenv("INTERVAL_IN_MINUTES")
 
 app = FastAPI()
 security = HTTPBasic()
@@ -23,17 +24,15 @@ db = exe(SERVERS_DB, True)
 
 
 # Polls servers using gamedig and writes updates to elara
-syncronizer = Thread(target=start_sync, args=(
-    db, SERVERS_DOCUMENT, int(INTERVAL_IN_MINUTES)))
-syncronizer.setDaemon(True)
+syncronizer = Thread(target=start_sync, args=(db, SERVERS_DOCUMENT, int(INTERVAL_IN_MINUTES)))
+syncronizer.daemon = True
 syncronizer.start()
 
 
 # TODO: Replace with discord auth validation
 def auth_validation(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(credentials.username, BASIC_USER)
-    correct_password = secrets.compare_digest(
-        credentials.password, BASIC_PASSWORD)
+    correct_password = secrets.compare_digest(credentials.password, BASIC_PASSWORD)
     if not (correct_username and correct_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,7 +44,7 @@ def auth_validation(credentials: HTTPBasicCredentials = Depends(security)):
 def executor(server_id: str, function_code: str):
     if db.hexists(SERVERS_DB, server_id):
         server = Server(db.hget(SERVERS_DB, server_id))
-        os.system('./%s %s' % server.code, function_code)
+        os.system(f"./{server.code} {function_code}")
         return {"status": "success"}
     else:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -84,36 +83,37 @@ async def set_item(server_id: str, body: Server, credentials: HTTPBasicCredentia
 
 
 @app.post("/servers/{server_id}/start", response_model=Server)
-async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def start_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "start")
 
 
 @app.post("/servers/{server_id}/stop", response_model=Server)
-async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def stop_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     server: Server = db.hget(SERVERS_DOCUMENT, server_id)
-    server.status = 'offline'
+    server.status = "offline"
     db.hadd(SERVERS_DOCUMENT, server_id, server)
     db.commit()
     return executor(server_id, "stop")
 
 
 @app.post("/servers/{server_id}/restart", response_model=Server)
-async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def restart_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     server: Server = db.hget(SERVERS_DOCUMENT, server_id)
-    server.status = 'restarting'
+    server.status = "restarting"
     db.hadd(SERVERS_DOCUMENT, server_id, server)
     db.commit()
     return executor(server_id, "restart")
 
 
 @app.post("/servers/{server_id}/update", response_model=Server)
-async def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
+async def update_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
     return executor(server_id, "update")
+
 
 # @app.get("/servers/{server_id}/swap", response_model=Server)
 # def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
-    # return executor(server_id, "swap")
+# return executor(server_id, "swap")
 
 # @app.get("/servers/{server_id}/archive", response_model=Server)
 # def read_item(server_id: str, credentials: HTTPBasicCredentials = Depends(auth_validation)):
-    # return executor(server_id, "archive")
+# return executor(server_id, "archive")

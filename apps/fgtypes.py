@@ -1,3 +1,4 @@
+"""types"""
 from typing import List, Optional
 from pydantic import BaseModel, create_model
 from enum import Enum
@@ -10,8 +11,8 @@ class Server(BaseModel):
     path: str = None
     port: str = None
     description: str = ''
-    playerCount: int = 0
-    maxPlayers: int = 0
+    player_count: int = 0
+    max_players: int = 0
     status: str = ''
 
 
@@ -19,7 +20,7 @@ class GameDigServerRaw(BaseModel):
     protocol: int = 0
     folder: str = ''
     game: str = ''
-    appId: int = 0
+    app_id: int = 0
     numplayers: int = 0
     numbots: int = 0
     listentype: str = ''

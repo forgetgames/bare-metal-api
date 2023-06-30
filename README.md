@@ -9,9 +9,11 @@ Requirements
 
 * LinuxGSM
 * OpenSSL
-* Python3.6+
-* pip 3
+* Python3.11+
+* poetry
 * uvicorn
+* docker
+* devcontainers
 
 ## Gettings Started
 
@@ -20,12 +22,13 @@ Requirements
 cp .env.template .env
 
 # Get application dependencies
-pip install -r requirements.txt
+poetry config virtualenvs.in-project true
+poetry install
 
 # Create certificates
 openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out certificate.pem
 
 # Run application
-python3 -m uvicorn main:app --host 0.0.0.0 --ssl-keyfile key.pem --ssl-certfile certificate.pem --reload
+./start.sh
 ```
 

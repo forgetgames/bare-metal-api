@@ -1,21 +1,21 @@
-from fgtypes import Status, SyncAction, UserAction
+"""fsm"""
+from apps.fgtypes import Status, SyncAction, UserAction
 from typing import List
+from dataclasses import dataclass
 
-
+@dataclass
 class ServerState():
-    status: Status
-    actions: List[UserAction]
-    transitions: List[SyncAction]
-
-    def __init__(self, status: Status, actions: List[UserAction], transitions: List[UserAction]):
-        self.status = status
-        self.actions = actions
-        self.transitions = transitions
+    """ node of state """
+    status: Status = None
+    actions: List[UserAction] = None
+    transitions: List[SyncAction] = None
 
 
+@dataclass
 class Fsm():
-    current: ServerState
-    graph: List[ServerState]
+    """ graph of nodes """
+    current: ServerState = None
+    graph: List[ServerState] = None
 
     # Default to offline when starting
     def init(self, status: Status):
