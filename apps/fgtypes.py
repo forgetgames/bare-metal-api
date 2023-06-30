@@ -5,6 +5,7 @@ from enum import Enum
 
 
 class Server(BaseModel):
+    """Atrributes store by FG BMA"""
     name: str = ''
     protocol: str = ''
     code: str = ''
@@ -17,6 +18,7 @@ class Server(BaseModel):
 
 
 class GameDigServerRaw(BaseModel):
+    """Atrributes retrieved from gamedig"""
     protocol: int = 0
     folder: str = ''
     game: str = ''
@@ -32,6 +34,7 @@ class GameDigServerRaw(BaseModel):
 
 
 class GameDigServer(BaseModel):
+    """Locational info for gamedig"""
     name: str = ''
     map: str = ''
     password: bool = True
